@@ -38,6 +38,33 @@ These numbers are self-reported historical results from the linked [progress rep
 
 The report also documents the product's strategic shift: early feature expansion created attention but weak retention, so the experience was refocused around one value proposition — helping users find informational edge in noisy prediction markets.
 
+## Real product screenshots
+
+These screenshots were captured from the live public product on **October 2, 2026**. The values shown are point-in-time product data, not fabricated demo content or reconstructed mockups.
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="assets/product-markets.png" alt="ElonTracker prediction market overview" />
+      <br /><strong>Market overview</strong><br />Active periods, probability ranges, volume, and time remaining in one scan-friendly view.
+    </td>
+    <td width="50%">
+      <img src="assets/product-analytics.png" alt="ElonTracker activity analytics dashboard" />
+      <br /><strong>Activity analytics</strong><br />Live statistics and an hourly heatmap place current posting behavior in historical context.
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <img src="assets/product-signals.png" alt="ElonTracker AI prediction signals" />
+      <br /><strong>AI signal workspace</strong><br />Directional signals expose entry price, live price, target, confidence, and remaining time.
+    </td>
+    <td width="50%">
+      <img src="assets/product-calculator.png" alt="ElonTracker multi-range calculator" />
+      <br /><strong>Multi-range calculator</strong><br />Users can compare outcomes and construct a position before handing execution to Polymarket.
+    </td>
+  </tr>
+</table>
+
 ## Product surface
 
 | Surface | User outcome |
