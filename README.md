@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://elon-tracker.com/og-image-v2.png" width="100%" alt="ElonTracker official product cover" />
+  <img src="assets/elontracker-cover.png" width="100%" alt="ElonTracker official product cover" />
 </p>
 
 # ElonTracker
