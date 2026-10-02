@@ -14,9 +14,11 @@ ElonTracker turns public posting activity into structured market context. It com
 
 > This is a public product and engineering showcase. Production source code, data-provider credentials, model prompts, signal thresholds, execution routing, and user data remain private.
 
-<p align="center">
-  <img src="assets/product-home.png" width="100%" alt="ElonTracker public home screen" />
-</p>
+![ElonTracker product walkthrough](assets/product-tour.gif)
+
+| Product | My contribution | Status | Core stack |
+| --- | --- | --- | --- |
+| Prediction-market research and signal workspace | Product strategy, UX, analytics, AI signals, Stripe billing, Telegram delivery, and operations | Live product | TypeScript, React, Python services, LLMs, Stripe, Telegram, Polymarket data |
 
 ## My role
 
