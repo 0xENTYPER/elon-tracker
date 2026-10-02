@@ -445,4 +445,4 @@ ElonTracker is an independent analytics product and is not affiliated with Elon 
 
 ## Author
 
-Built by [@elon_tracker](https://x.com/elon_tracker).
+Built by [0xENTYPER](https://github.com/0xENTYPER).
