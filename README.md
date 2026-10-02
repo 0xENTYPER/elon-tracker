@@ -8,9 +8,31 @@
 
 [Open ElonTracker](https://elon-tracker.com) · [Progress report](https://x.com/elon_tracker/status/2046605110122283144) · [X](https://x.com/elon_tracker)
 
+![Product](https://img.shields.io/badge/product-live-7C5CFC) ![Users](https://img.shields.io/badge/Telegram_users-688-20C997) ![Volume](https://img.shields.io/badge/user_generated_volume-$68K-20C997) ![Payments](https://img.shields.io/badge/payments-Stripe-635BFF) ![Execution](https://img.shields.io/badge/execution-non--custodial-111827)
+
 ElonTracker turns public posting activity into structured market context. It combines real-time activity tracking, historical behavior, prediction-market prices, AI-generated signals, and Telegram delivery so traders can evaluate noisy event markets from one workspace.
 
 > This is a public product and engineering showcase. Production source code, data-provider credentials, model prompts, signal thresholds, execution routing, and user data remain private.
+
+<p align="center">
+  <img src="assets/product-home.png" width="100%" alt="ElonTracker public home screen" />
+</p>
+
+## My role
+
+I designed and shipped ElonTracker as an end-to-end product, not a dashboard mockup. My work covered product discovery, UX, data modeling, analytics, AI-assisted signals, payment infrastructure, Telegram delivery, wallet-aware flows, launch, and iteration after observing real user behavior.
+
+| Area I owned | What I delivered |
+| --- | --- |
+| Product strategy | Narrowed a broad prediction toolkit into a clear workflow for post-count markets |
+| Data engineering | Normalized activity events, market windows, prices, liquidity, and timestamps from independent sources |
+| Analytics | Built counters, historical series, heatmaps, rolling behavior, backtests, and freshness states |
+| Signal system | Joined forecast probability with market price, confidence, liquidity, and expiry |
+| Frontend and UX | Designed a dense but readable research workspace across desktop and mobile |
+| Payments | Integrated Stripe for the paid phase, including checkout, webhook-driven access state, and failure-safe entitlement handling |
+| Distribution | Built Telegram alerts and deep links back into the relevant market context |
+| Trading handoff | Connected users to official Polymarket infrastructure while keeping execution non-custodial |
+| Operations | Shipped the public product, monitored product behavior, and changed the business model when retention data challenged the original assumptions |
 
 ## The problem
 
@@ -65,6 +87,21 @@ These screenshots were captured from the live public product on **October 2, 202
   </tr>
 </table>
 
+### Product expansion and monetization surface
+
+<table>
+  <tr>
+    <td width="50%">
+      <img src="assets/product-support.png" alt="ElonTracker current support and wallet tipping screen" />
+      <br /><strong>Current support model</strong><br />After testing paid access, the core product moved to free access with optional wallet-based support on Base, Polygon, and Solana.
+    </td>
+    <td width="50%">
+      <img src="assets/product-elonbroker.png" alt="ElonBroker RWA product branch" />
+      <br /><strong>Adjacent product architecture</strong><br />The same product system extends into an RWA branch with token utility, an NFT roadmap, and ERC-6551-ready account design.
+    </td>
+  </tr>
+</table>
+
 ## Product surface
 
 | Surface | User outcome |
@@ -98,6 +135,49 @@ flowchart LR
 ```
 
 The forecast is only one input. Signal quality depends on joining it with market probability, liquidity, time remaining, and freshness before showing an opportunity.
+
+## System architecture
+
+```mermaid
+flowchart TB
+    subgraph Sources
+        SOCIAL[Public activity sources]
+        MARKET[Polymarket data]
+        USER[Wallet and user actions]
+    end
+
+    subgraph Data_and_Intelligence[Data and intelligence]
+        INGEST[Ingestion and reconciliation]
+        STORE[(Normalized event store)]
+        FEATURES[Feature calculation]
+        MODEL[Forecast layer]
+        EVAL[Edge and risk evaluator]
+    end
+
+    subgraph Product[Product surfaces]
+        WEB[Web workspace]
+        BOT[Telegram bot]
+        API[Authenticated signal API]
+    end
+
+    subgraph Commercial[Commercial infrastructure]
+        STRIPE[Stripe Checkout]
+        WEBHOOK[Verified webhooks]
+        ACCESS[Entitlement state]
+    end
+
+    SOCIAL --> INGEST
+    MARKET --> INGEST
+    INGEST --> STORE --> FEATURES --> MODEL --> EVAL
+    MARKET --> EVAL
+    EVAL --> WEB
+    EVAL --> BOT
+    EVAL --> API
+    USER --> WEB
+    WEB --> STRIPE --> WEBHOOK --> ACCESS --> WEB
+```
+
+The boundaries are deliberate: collection does not decide; forecasting does not execute; billing does not trust the browser; and every user-facing signal carries enough provenance to explain when it was produced and when it expires.
 
 ## Core data model
 
@@ -160,6 +240,117 @@ The web application supports comparison and deep analysis. Telegram is used for 
 
 ElonTracker supplies analytics and an execution handoff. Wallet authorization and final submission remain explicit user actions through supported market infrastructure.
 
+## Monetization and Stripe
+
+I integrated Stripe during the paid-access phase of ElonTracker. The important work was not the checkout button; it was keeping payment state, application access, retries, and cancellation behavior consistent across systems.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as ElonTracker
+    participant S as Stripe Checkout
+    participant W as Webhook handler
+    participant D as Access store
+
+    U->>A: Select paid access
+    A->>S: Create checkout session
+    S-->>U: Hosted payment flow
+    S->>W: Signed subscription event
+    W->>W: Verify signature and event id
+    W->>D: Upsert entitlement
+    D-->>A: Active access state
+    A-->>U: Unlock paid capability
+```
+
+The integration was designed around four rules:
+
+- **Server-authoritative access:** a success redirect never grants access by itself.
+- **Verified webhooks:** subscription state changes are accepted only after signature verification.
+- **Idempotency:** repeated Stripe events cannot create duplicate access records or side effects.
+- **Explicit lifecycle states:** trialing, active, past due, canceled, and expired remain distinct.
+
+The product later moved from subscriptions to free access with optional tips. That was a product decision informed by activation and retention, not a technical limitation. The Stripe integration remains evidence that I can build billing correctly, while the pivot demonstrates that I do not protect an implementation when the product data argues for a simpler model.
+
+## Selected implementation patterns
+
+The production repository is private. The excerpts below are sanitized, representative versions of the boundaries used in the product; secrets, provider-specific routing, prompts, and proprietary scoring logic are intentionally omitted.
+
+### 1. Freshness-aware signal evaluation
+
+```ts
+type EvaluationInput = {
+  forecast: { probability: number; confidence: number; observedAt: Date };
+  market: { probability: number; liquidityUsd: number; observedAt: Date };
+  closesAt: Date;
+};
+
+export function evaluateCandidate(input: EvaluationInput, now: Date) {
+  const forecastAgeMs = now.getTime() - input.forecast.observedAt.getTime();
+  const marketAgeMs = now.getTime() - input.market.observedAt.getTime();
+  const expiresInMs = input.closesAt.getTime() - now.getTime();
+  const edge = input.forecast.probability - input.market.probability;
+
+  if (forecastAgeMs > FORECAST_TTL_MS) return { state: "stale_forecast" };
+  if (marketAgeMs > QUOTE_TTL_MS) return { state: "stale_market" };
+  if (expiresInMs <= MIN_EXECUTION_WINDOW_MS) return { state: "too_late" };
+  if (input.market.liquidityUsd < MIN_LIQUIDITY_USD) return { state: "thin_market" };
+  if (input.forecast.confidence < MIN_CONFIDENCE) return { state: "low_confidence" };
+
+  return { state: "eligible", direction: edge >= 0 ? "yes" : "no", edge };
+}
+```
+
+Why this matters: a good forecast paired with an old quote is not a live opportunity. Freshness is evaluated as part of the domain model instead of being shown only as decorative UI metadata.
+
+### 2. Idempotent Stripe webhook boundary
+
+```ts
+export async function handleStripeWebhook(rawBody: string, signature: string) {
+  const event = stripe.webhooks.constructEvent(
+    rawBody,
+    signature,
+    env.STRIPE_WEBHOOK_SECRET,
+  );
+
+  await database.transaction(async (tx) => {
+    if (await tx.processedEvents.exists(event.id)) return;
+
+    const update = mapStripeEventToEntitlement(event);
+    if (update) await tx.entitlements.upsert(update);
+
+    await tx.processedEvents.insert({
+      id: event.id,
+      processedAt: new Date(),
+    });
+  });
+}
+```
+
+Why this matters: Stripe retries delivery. Processing the same event twice must be harmless, and browser redirects must never become the source of truth for paid access.
+
+### 3. Auditable UI state instead of silent fallbacks
+
+```tsx
+type MetricState<T> =
+  | { status: "ready"; value: T; observedAt: string; source: string }
+  | { status: "stale"; lastValue: T; observedAt: string; source: string }
+  | { status: "unavailable"; reason: "provider" | "unsupported" | "empty" };
+
+function MarketProbability({ metric }: { metric: MetricState<number> }) {
+  if (metric.status === "unavailable") return <Unavailable reason={metric.reason} />;
+  return (
+    <Metric
+      value={formatPercent(metric.status === "ready" ? metric.value : metric.lastValue)}
+      source={metric.source}
+      timestamp={metric.observedAt}
+      stale={metric.status === "stale"}
+    />
+  );
+}
+```
+
+Why this matters: substituting a different metric when data is missing creates confident-looking misinformation. The interface preserves source, timestamp, and unavailable states all the way to the component.
+
 ## Public signal contract
 
 The public product documents an authenticated signal endpoint. A response can be modeled around a compact, provenance-aware contract:
@@ -210,15 +401,30 @@ The highest-risk boundaries deserve separate checks:
 
 ## Technology snapshot
 
-| Area | Publicly visible approach |
+| Area | Implementation responsibility |
 | --- | --- |
-| Client | Responsive web application and installable app surface |
-| Analytics | Real-time counters, historical series, heatmaps, moving averages, and backtests |
-| Intelligence | AI-assisted forecast and positive-EV signal layer |
-| Markets | Polymarket market data and official execution infrastructure |
-| Delivery | Web dashboard, Telegram bot, and authenticated signal API |
-| Wallet model | Non-custodial user authorization |
-| Data discipline | Source attribution, freshness, explicit time zones, and historical evaluation |
+| Client | Responsive application, reusable analytical primitives, mobile states, and installable app surface |
+| Data | Event ingestion, normalization, reconciliation, freshness tracking, and historical aggregation |
+| Analytics | Real-time counters, time-series views, heatmaps, moving averages, and leakage-safe backtests |
+| Intelligence | AI-assisted forecasting separated from price, liquidity, and signal eligibility |
+| Markets | Polymarket market discovery, normalized outcome ranges, live context, and official execution handoff |
+| Payments | Stripe Checkout, signed webhook processing, idempotency, and entitlement lifecycle during the paid phase |
+| Delivery | Web workspace, Telegram alerts, deep links, and an authenticated signal API |
+| Wallet model | Explicit user authorization and non-custodial interaction boundaries |
+| Reliability | Source attribution, canonical timestamps, stale states, retries, deduplication, and observable failures |
+
+## Product judgment, not only implementation
+
+The strongest lesson from ElonTracker was that shipping more features is not the same as creating more value. The first phase proved demand and distribution. The next phase reduced the product to a clearer promise, simplified access, and concentrated the interface around the decisions users repeatedly made.
+
+That iteration demonstrates the full scope of the work:
+
+- turning an ambiguous market behavior into a structured product domain;
+- shipping enough infrastructure to charge for access through Stripe;
+- measuring whether paid complexity improved retention;
+- removing friction when the evidence favored reach and repeated usage;
+- preserving optional monetization without weakening the core experience;
+- expanding the underlying product system into additional tracked figures and an RWA branch.
 
 ## What stays private
 
